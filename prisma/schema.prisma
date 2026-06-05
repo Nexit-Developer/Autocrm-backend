@@ -1,0 +1,218 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+ 
+}
+// ==================== COMPANIES ====================
+
+model Company {
+  id        Int      @id @default(autoincrement())
+  name      String
+  logo      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users      User[]
+  leads      Lead[]
+  customers  Customer[]
+}
+
+// ==================== USERS ====================
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(AGENT)
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId   Int?
+  company     Company? @relation(fields: [companyId], references: [id])
+
+  managerId    Int?
+  manager      User?  @relation("ManagerToUser", fields: [managerId], references: [id])
+  subordinates User[] @relation("ManagerToUser")
+
+  assignedLeads Lead[]     @relation("AgentLeads")
+  createdLeads  Lead[]     @relation("CreatedLeads")
+  activities    Activity[]
+  attendances   Attendance[]
+  leaves        Leave[]
+  payrolls      Payroll[]
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  HR
+  MANAGER
+  TEAM_LEAD
+  AGENT
+}
+
+// ==================== LEADS ====================
+
+model Lead {
+  id        Int        @id @default(autoincrement())
+  name      String
+  phone     String
+  email     String?
+  city      String?
+  source    String     @default("Meta")
+  status    LeadStatus @default(NEW)
+  notes     String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  companyId   Int
+  company     Company @relation(fields: [companyId], references: [id])
+
+  createdById  Int
+  createdBy    User  @relation("CreatedLeads", fields: [createdById], references: [id])
+
+  assignedToId Int?
+  assignedTo   User? @relation("AgentLeads", fields: [assignedToId], references: [id])
+
+  activities Activity[]
+  customer   Customer?
+}
+
+enum LeadStatus {
+  NEW
+  ASSIGNED
+  CALLED
+  NO_ANSWER
+  INTERESTED
+  NOT_INTERESTED
+  CONVERTED
+}
+
+// ==================== ACTIVITIES ====================
+
+model Activity {
+  id        Int          @id @default(autoincrement())
+  type      ActivityType
+  notes     String?
+  createdAt DateTime     @default(now())
+
+  leadId Int
+  lead   Lead @relation(fields: [leadId], references: [id])
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+}
+
+enum ActivityType {
+  CALL
+  MESSAGE
+  EMAIL
+  NOTE
+  STATUS_CHANGE
+}
+
+// ==================== CUSTOMERS ====================
+
+model Customer {
+  id             Int             @id @default(autoincrement())
+  name           String
+  phone          String
+  email          String?         @unique
+  password       String
+  paymentStatus  PaymentStatus   @default(UNPAID)
+  deliveryStatus DeliveryStatus?
+  carModel       String?
+  carColor       String?
+  amount         Float?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  companyId Int
+  company   Company @relation(fields: [companyId], references: [id])
+
+  leadId Int    @unique
+  lead   Lead   @relation(fields: [leadId], references: [id])
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  COMPLETE
+}
+
+enum DeliveryStatus {
+  RESERVED
+  IN_PROCESS
+  SHIPPED
+  ARRIVED
+}
+
+// ==================== ATTENDANCE ====================
+
+model Attendance {
+  id        Int              @id @default(autoincrement())
+  date      DateTime         @default(now())
+  checkIn   DateTime?
+  checkOut  DateTime?
+  status    AttendanceStatus @default(PRESENT)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+}
+
+// ==================== LEAVE ====================
+
+model Leave {
+  id        Int         @id @default(autoincrement())
+  type      LeaveType
+  reason    String
+  startDate DateTime
+  endDate   DateTime
+  status    LeaveStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+}
+
+enum LeaveType {
+  SICK
+  CASUAL
+  ANNUAL
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ==================== PAYROLL ====================
+
+model Payroll {
+  id          Int      @id @default(autoincrement())
+  month       String
+  basicSalary Float
+  deductions  Float    @default(0)
+  bonus       Float    @default(0)
+  netSalary   Float
+  isPaid      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+}
