@@ -8,6 +8,7 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
+
 // Test route
 app.get('/', (req, res) => {
   res.json({ message: 'AutoCRM API is running!' })
@@ -15,6 +16,7 @@ app.get('/', (req, res) => {
 
 // Routes
 app.use('/api/auth', require('./routes/auth'))
+app.use('/api/admin', require('./routes/admin'))
 
 const PORT = process.env.PORT || 5000
 
