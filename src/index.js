@@ -9,7 +9,8 @@ app.use(cors())
 app.use(express.json())
 app.use('/api/leads', require('./routes/leads'))
 app.use('/api/customers', require('./routes/customers'))
-
+app.use('/api/manager', require('./routes/manager'))
+app.use('/api/agent', require('./routes/agent'))
 
 // Test route
 app.get('/', (req, res) => {
