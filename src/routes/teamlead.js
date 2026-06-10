@@ -6,15 +6,13 @@ const prisma = require('../utils/prisma')
 // Get team lead stats
 router.get('/stats', protect, authorize('TEAM_LEAD'), async (req, res) => {
   try {
-    const companyId = req.user.companyId
-
+    const teamLeadId = req.user.id
     const [totalLeads, assignedLeads, convertedLeads, totalAgents] = await Promise.all([
-      prisma.lead.count({ where: { companyId } }),
-      prisma.lead.count({ where: { companyId, status: 'ASSIGNED' } }),
-      prisma.lead.count({ where: { companyId, status: 'CONVERTED' } }),
-      prisma.user.count({ where: { role: 'AGENT', companyId, isActive: true } }),
+      prisma.lead.count({ where: { teamLeadId } }),
+      prisma.lead.count({ where: { teamLeadId, assignedToId: { not: null } } }),
+      prisma.lead.count({ where: { teamLeadId, status: 'CONVERTED' } }),
+      prisma.user.count({ where: { role: 'AGENT', companyId: req.user.companyId, isActive: true } }),
     ])
-
     res.json({ totalLeads, assignedLeads, convertedLeads, totalAgents })
   } catch (error) {
     console.error(error)
@@ -26,7 +24,7 @@ router.get('/stats', protect, authorize('TEAM_LEAD'), async (req, res) => {
 router.get('/recent-leads', protect, authorize('TEAM_LEAD'), async (req, res) => {
   try {
     const leads = await prisma.lead.findMany({
-      where: { companyId: req.user.companyId },
+      where: { teamLeadId: req.user.id },
       orderBy: { createdAt: 'desc' },
       take: 8,
       include: { assignedTo: true }
@@ -38,34 +36,11 @@ router.get('/recent-leads', protect, authorize('TEAM_LEAD'), async (req, res) =>
   }
 })
 
-// Get agents in company
-router.get('/agents', protect, authorize('TEAM_LEAD'), async (req, res) => {
-  try {
-    const agents = await prisma.user.findMany({
-      where: {
-        role: 'AGENT',
-        companyId: req.user.companyId,
-        isActive: true
-      },
-      include: {
-        _count: {
-          select: { assignedLeads: true }
-        }
-      },
-      orderBy: { name: 'asc' }
-    })
-    res.json(agents)
-  } catch (error) {
-    console.error(error)
-    res.status(500).json({ message: 'Server error' })
-  }
-})
-
-// Get all leads for team lead company
+// Get all leads assigned to this team lead
 router.get('/leads', protect, authorize('TEAM_LEAD'), async (req, res) => {
   try {
     const leads = await prisma.lead.findMany({
-      where: { companyId: req.user.companyId },
+      where: { teamLeadId: req.user.id },
       include: { assignedTo: true },
       orderBy: { createdAt: 'desc' }
     })
@@ -88,6 +63,45 @@ router.put('/leads/:id/assign', protect, authorize('TEAM_LEAD'), async (req, res
       }
     })
     res.json({ message: 'Lead assigned successfully' })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: 'Server error' })
+  }
+})
+
+// Bulk assign to agent
+router.post('/leads/bulk-assign', protect, authorize('TEAM_LEAD'), async (req, res) => {
+  try {
+    const { leadIds, assignedToId } = req.body
+    await prisma.lead.updateMany({
+      where: { id: { in: leadIds } },
+      data: {
+        assignedToId: parseInt(assignedToId),
+        status: 'ASSIGNED'
+      }
+    })
+    res.json({ message: `${leadIds.length} leads assigned successfully` })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: 'Server error' })
+  }
+})
+
+// Get agents in company
+router.get('/agents', protect, authorize('TEAM_LEAD'), async (req, res) => {
+  try {
+    const agents = await prisma.user.findMany({
+      where: {
+        role: 'AGENT',
+        companyId: req.user.companyId,
+        isActive: true
+      },
+      include: {
+        _count: { select: { assignedLeads: true } }
+      },
+      orderBy: { name: 'asc' }
+    })
+    res.json(agents)
   } catch (error) {
     console.error(error)
     res.status(500).json({ message: 'Server error' })

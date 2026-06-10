@@ -244,4 +244,81 @@ router.get('/managers', protect, authorize('SUPER_ADMIN', 'ADMIN'), async (req, 
     res.status(500).json({ message: 'Server error' })
   }
 })
+// Get all employees across all companies
+router.get('/all-employees', protect, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  try {
+    const employees = await prisma.user.findMany({
+      where: { isActive: true },
+      include: { company: true },
+      orderBy: { name: 'asc' }
+    })
+    res.json(employees)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: 'Server error' })
+  }
+})
+
+// Get payroll across all companies
+router.get('/payroll', protect, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  try {
+    const { month } = req.query
+    const payrolls = await prisma.payroll.findMany({
+      where: { month },
+      include: { user: { include: { company: true } } }
+    })
+    res.json(payrolls)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: 'Server error' })
+  }
+})
+
+// Get performance across all companies
+router.get('/performance', protect, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
+  try {
+    const employees = await prisma.user.findMany({
+      where: {
+        isActive: true,
+        role: { in: ['AGENT', 'TEAM_LEAD', 'MANAGER'] }
+      },
+      include: {
+        company: true,
+        _count: { select: { assignedLeads: true } }
+      }
+    })
+
+    const performance = await Promise.all(
+      employees.map(async (emp) => {
+        const [contactedLeads, convertedLeads] = await Promise.all([
+          prisma.lead.count({
+            where: {
+              assignedToId: emp.id,
+              status: { in: ['CALLED', 'INTERESTED', 'CONVERTED'] }
+            }
+          }),
+          prisma.lead.count({
+            where: { assignedToId: emp.id, status: 'CONVERTED' }
+          })
+        ])
+        return {
+          id: emp.id,
+          name: emp.name,
+          email: emp.email,
+          role: emp.role,
+          companyId: emp.companyId,
+          companyName: emp.company?.name,
+          totalLeads: emp._count.assignedLeads,
+          contactedLeads,
+          convertedLeads
+        }
+      })
+    )
+
+    res.json(performance)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: 'Server error' })
+  }
+})
 module.exports = router

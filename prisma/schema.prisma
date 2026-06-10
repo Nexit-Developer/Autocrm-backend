@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
- 
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 // ==================== COMPANIES ====================
 
@@ -34,20 +35,23 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  companyId   Int?
-  company     Company? @relation(fields: [companyId], references: [id])
+  companyId    Int?
+  company      Company? @relation(fields: [companyId], references: [id])
 
   managerId    Int?
   manager      User?  @relation("ManagerToUser", fields: [managerId], references: [id])
   subordinates User[] @relation("ManagerToUser")
-  assignedCustomers Customer[] @relation("AgentCustomers")
 
-  assignedLeads Lead[]     @relation("AgentLeads")
-  createdLeads  Lead[]     @relation("CreatedLeads")
-  activities    Activity[]
-  attendances   Attendance[]
-  leaves        Leave[]
-  payrolls      Payroll[]
+  assignedLeads  Lead[] @relation("AgentLeads")
+  createdLeads   Lead[] @relation("CreatedLeads")
+  managedLeads   Lead[] @relation("ManagerLeads")
+  teamLeadLeads  Lead[] @relation("TeamLeadLeads")
+
+  activities   Activity[]
+  attendances  Attendance[]
+  leaves       Leave[]
+  payrolls     Payroll[]
+  assignedCustomers Customer[] @relation("AgentCustomers")
 }
 
 enum Role {
@@ -60,31 +64,40 @@ enum Role {
 }
 
 // ==================== LEADS ====================
-
 model Lead {
-  id        Int        @id @default(autoincrement())
-  name      String
-  phone     String
-  email     String?
-  city      String?
-  source    String     @default("Meta")
-  status    LeadStatus @default(NEW)
-  notes     String?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id           Int        @id @default(autoincrement())
+  name         String
+  phone        String
+  email        String?
+  city         String?
+  source       String     @default("Meta")
+  platform     String?
+  adName       String?
+  campaignName String?
+  status       LeadStatus @default(NEW)
+  notes        String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
-  companyId   Int
-  company     Company @relation(fields: [companyId], references: [id])
+  companyId    Int
+  company      Company @relation(fields: [companyId], references: [id])
 
   createdById  Int
-  createdBy    User  @relation("CreatedLeads", fields: [createdById], references: [id])
+  createdBy    User   @relation("CreatedLeads", fields: [createdById], references: [id])
+
+  managerId    Int?
+  manager      User?  @relation("ManagerLeads", fields: [managerId], references: [id])
+
+  teamLeadId   Int?
+  teamLead     User?  @relation("TeamLeadLeads", fields: [teamLeadId], references: [id])
 
   assignedToId Int?
-  assignedTo   User? @relation("AgentLeads", fields: [assignedToId], references: [id])
+  assignedTo   User?  @relation("AgentLeads", fields: [assignedToId], references: [id])
 
-  activities Activity[]
-  customer   Customer?
+  activities   Activity[]
+  customer     Customer?
 }
+
 
 enum LeadStatus {
   NEW
