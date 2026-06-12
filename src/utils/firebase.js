@@ -5,19 +5,24 @@ try {
   console.error('firebase-admin not found:', e.message)
 }
 
-const path = require('path')
-
 let messaging = null
 
 try {
-  const serviceAccount = require(path.join(__dirname, '../../firebase-service-account.json'))
-  
+  let serviceAccount
+
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON)
+  } else {
+    const path = require('path')
+    serviceAccount = require(path.join(__dirname, '../../firebase-service-account.json'))
+  }
+
   if (admin && !admin.apps.length) {
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount)
     })
   }
-  
+
   messaging = admin.messaging()
 } catch (error) {
   console.error('Firebase init failed:', error.message)
