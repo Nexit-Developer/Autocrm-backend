@@ -1,5 +1,6 @@
 const cron = require('node-cron')
 const prisma = require('./prisma')
+const { sendNotification } = require('./sendNotification')
 
 const startCronJobs = () => {
   // Run every day at 2:00 AM — mark absent for anyone who never checked in
@@ -51,6 +52,47 @@ const startCronJobs = () => {
       console.error('Auto-absent job failed:', error)
     }
   })
+  // Check for tasks due in 24 hours - runs every hour
+cron.schedule('0 * * * *', async () => {
+  console.log('Checking for tasks due soon...')
+  try {
+    const tomorrow = new Date()
+    tomorrow.setHours(tomorrow.getHours() + 24)
+
+    const dueSoonTasks = await prisma.task.findMany({
+      where: {
+        dueDate: {
+          lte: tomorrow,
+          gte: new Date()
+        },
+        status: { in: ['TODO', 'IN_PROGRESS'] }
+      },
+      include: {
+        assignedTo: { select: { id: true, name: true } },
+        createdBy: { select: { id: true, name: true } }
+      }
+    })
+
+    for (const task of dueSoonTasks) {
+      await sendNotification(
+        task.assignedToId,
+        '⏰ Task due soon',
+        `Task "${task.title}" is due in less than 24 hours!`,
+        'WARNING',
+        '/tasks'
+      )
+      await sendNotification(
+        task.createdById,
+        '⏰ Task due soon',
+        `Task "${task.title}" assigned to ${task.assignedTo.name} is due in less than 24 hours!`,
+        'WARNING',
+        '/tasks'
+      )
+    }
+  } catch (error) {
+    console.error('Task due check failed:', error)
+  }
+})
 
   console.log('Cron jobs started')
 }

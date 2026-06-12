@@ -1,3 +1,4 @@
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -20,6 +21,9 @@ model Company {
   users      User[]
   leads      Lead[]
   customers  Customer[]
+  announcements Announcement[]
+  policies      Policy[]
+  tasks Task[]
 }
 
 // ==================== USERS ====================
@@ -34,6 +38,7 @@ model User {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  fcmToken  String?
 
   companyId    Int?
   company      Company? @relation(fields: [companyId], references: [id])
@@ -52,6 +57,15 @@ model User {
   leaves       Leave[]
   payrolls     Payroll[]
   assignedCustomers Customer[] @relation("AgentCustomers")
+  notifications     Notification[]
+sentMessages      Message[]      @relation("SentMessages")
+receivedMessages  Message[]      @relation("ReceivedMessages")
+announcements     Announcement[]
+updatedPolicies   Policy[]
+createdTasks   Task[] @relation("CreatedTasks")
+assignedTasks  Task[] @relation("AssignedTasks")
+taskComments   TaskComment[]
+  
 }
 
 enum Role {
@@ -241,4 +255,118 @@ model OTP {
   otp       String
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+// ==================== NOTIFICATIONS ====================
+model Notification {
+  id        Int              @id @default(autoincrement())
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  isRead    Boolean          @default(false)
+  link      String?
+  createdAt DateTime         @default(now())
+
+  userId    Int
+  user      User @relation(fields: [userId], references: [id])
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  ALERT
+  SUCCESS
+}
+
+// ==================== ANNOUNCEMENTS ====================
+model Announcement {
+  id          Int      @id @default(autoincrement())
+  title       String
+  message     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdById Int
+  createdBy   User    @relation(fields: [createdById], references: [id])
+
+  companyId   Int
+  company     Company @relation(fields: [companyId], references: [id])
+}
+
+// ==================== MESSAGES ====================
+model Message {
+  id         Int      @id @default(autoincrement())
+  content    String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  senderId   Int
+  sender     User @relation("SentMessages", fields: [senderId], references: [id])
+
+  receiverId Int
+  receiver   User @relation("ReceivedMessages", fields: [receiverId], references: [id])
+}
+
+// ==================== POLICY ====================
+model Policy {
+  id          Int      @id @default(autoincrement())
+  title       String
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  companyId   Int
+  company     Company @relation(fields: [companyId], references: [id])
+
+  updatedById Int
+  updatedBy   User @relation(fields: [updatedById], references: [id])
+}
+
+// ==================== TASKS ====================
+
+model Task {
+  id          Int        @id @default(autoincrement())
+  title       String
+  description String?
+  dueDate     DateTime?
+  priority    Priority   @default(MEDIUM)
+  status      TaskStatus @default(TODO)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  companyId   Int
+  company     Company @relation(fields: [companyId], references: [id])
+
+  createdById Int
+  createdBy   User   @relation("CreatedTasks", fields: [createdById], references: [id])
+
+  assignedToId Int
+  assignedTo   User  @relation("AssignedTasks", fields: [assignedToId], references: [id])
+
+  comments    TaskComment[]
+}
+
+model TaskComment {
+  id        Int      @id @default(autoincrement())
+  content   String
+  createdAt DateTime @default(now())
+
+  taskId    Int
+  task      Task @relation(fields: [taskId], references: [id])
+
+  userId    Int
+  user      User @relation(fields: [userId], references: [id])
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETED
+  APPROVED
 }

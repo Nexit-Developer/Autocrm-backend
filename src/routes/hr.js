@@ -130,19 +130,31 @@ router.get('/leaves', protect, authorize('HR', 'SUPER_ADMIN', 'ADMIN'), async (r
 })
 
 // Update leave status
+const { sendNotification } = require('../utils/sendNotification')
+
+// In leave update route:
 router.put('/leaves/:id', protect, authorize('HR', 'SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
-    await prisma.leave.update({
+    const leave = await prisma.leave.update({
       where: { id: parseInt(req.params.id) },
-      data: { status: req.body.status }
+      data: { status: req.body.status },
+      include: { user: true }
     })
+
+    await sendNotification(
+  leave.userId,
+  `Leave ${req.body.status.toLowerCase()}`,
+  `Your leave request has been ${req.body.status.toLowerCase()}`,
+  req.body.status === 'APPROVED' ? 'SUCCESS' : 'WARNING',
+  '/my-leave'
+)
+
     res.json({ message: 'Leave updated successfully' })
   } catch (error) {
     console.error(error)
     res.status(500).json({ message: 'Server error' })
   }
 })
-
 // Get payroll by month
 router.get('/payroll', protect, authorize('HR', 'SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {

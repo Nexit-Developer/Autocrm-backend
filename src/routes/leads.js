@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const { protect, authorize } = require('../middleware/auth')
 const prisma = require('../utils/prisma')
-
+const { sendNotification } = require('../utils/sendNotification')
 // Import leads from Excel
 router.post('/import', protect, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
@@ -94,18 +94,30 @@ router.get('/', protect, authorize('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'TEAM_LEAD
 
 // Assign lead to manager (Admin does this)
 // Assign lead to manager (Admin does this)
+
+
+// In the assign route add after prisma.lead.update:
 router.put('/:id/assign', protect, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
     const { assignedToId } = req.body
-    await prisma.lead.update({
+    const lead = await prisma.lead.update({
       where: { id: parseInt(req.params.id) },
       data: {
         assignedToId: parseInt(assignedToId),
         managerId: parseInt(assignedToId),
-        teamLeadId: null,  // clear teamLeadId when assigning to manager
+        teamLeadId: null,
         status: 'ASSIGNED'
       }
     })
+
+    // Notify the manager
+   await sendNotification(
+  parseInt(assignedToId),
+  'New lead assigned',
+  `You have been assigned a new lead: ${lead.name}`,
+  'INFO',
+  '/manager/leads'
+)
     res.json({ message: 'Lead assigned successfully' })
   } catch (error) {
     console.error(error)

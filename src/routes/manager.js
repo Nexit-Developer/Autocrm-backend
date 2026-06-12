@@ -52,10 +52,13 @@ router.get('/leads', protect, authorize('MANAGER'), async (req, res) => {
 })
 
 // Assign lead to team lead
+const { sendNotification } = require('../utils/sendNotification')
+
+// In assign route add after prisma.lead.update:
 router.put('/leads/:id/assign', protect, authorize('MANAGER'), async (req, res) => {
   try {
     const { assignedToId } = req.body
-    await prisma.lead.update({
+    const lead = await prisma.lead.update({
       where: { id: parseInt(req.params.id) },
       data: {
         assignedToId: parseInt(assignedToId),
@@ -63,13 +66,20 @@ router.put('/leads/:id/assign', protect, authorize('MANAGER'), async (req, res) 
         status: 'ASSIGNED'
       }
     })
+await sendNotification(
+  parseInt(assignedToId),
+  'New lead assigned',
+  `Manager assigned you a new lead: ${lead.name}`,
+  'INFO',
+  '/teamlead/leads'
+) 
+
     res.json({ message: 'Lead assigned successfully' })
   } catch (error) {
     console.error(error)
     res.status(500).json({ message: 'Server error' })
   }
 })
-
 // Bulk assign to team lead
 router.post('/leads/bulk-assign', protect, authorize('MANAGER'), async (req, res) => {
   try {

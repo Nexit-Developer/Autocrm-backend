@@ -52,16 +52,26 @@ router.get('/leads', protect, authorize('TEAM_LEAD'), async (req, res) => {
 })
 
 // Assign lead to agent
+const { sendNotification } = require('../utils/sendNotification')
+
 router.put('/leads/:id/assign', protect, authorize('TEAM_LEAD'), async (req, res) => {
   try {
     const { assignedToId } = req.body
-    await prisma.lead.update({
+    const lead = await prisma.lead.update({
       where: { id: parseInt(req.params.id) },
       data: {
         assignedToId: parseInt(assignedToId),
         status: 'ASSIGNED'
       }
     })
+
+   await sendNotification(
+  parseInt(assignedToId),
+  'New lead assigned',
+  `Team Lead assigned you a new lead: ${lead.name}`,
+  'INFO',
+  '/agent/leads'
+)
     res.json({ message: 'Lead assigned successfully' })
   } catch (error) {
     console.error(error)

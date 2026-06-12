@@ -69,6 +69,9 @@ router.get('/agents', protect, authorize('SUPER_ADMIN', 'ADMIN'), async (req, re
 })
 
 // Approve agent
+const { sendNotificationToAdmins } = require('../utils/sendNotification')
+
+// In approve agent route add:
 router.post('/approve-agent/:id', protect, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
     const { companyId, role } = req.body
@@ -82,6 +85,16 @@ router.post('/approve-agent/:id', protect, authorize('SUPER_ADMIN', 'ADMIN'), as
         role: role
       }
     })
+
+    // Notify the approved user
+    const { sendNotification } = require('../utils/sendNotification')
+    await sendNotification(
+  parseInt(id),
+  'Account approved',
+  'Your account has been approved. You can now login to AutoCRM.',
+  'SUCCESS',
+  '/profile'
+)
 
     res.json({ message: 'Agent approved successfully' })
   } catch (error) {
