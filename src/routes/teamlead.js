@@ -97,21 +97,25 @@ router.post('/leads/bulk-assign', protect, authorize('TEAM_LEAD'), async (req, r
   }
 })
 
-// Get agents in company
+const { getOrSet } = require('../utils/cache')
+
 router.get('/agents', protect, authorize('TEAM_LEAD'), async (req, res) => {
   try {
-    const agents = await prisma.user.findMany({
-      where: {
-        role: 'AGENT',
-        companyId: req.user.companyId,
-        isActive: true
-      },
-      include: {
-        _count: { select: { assignedLeads: true } }
-      },
-      orderBy: { name: 'asc' }
-    })
-    res.json(agents)
+    const key = `teamlead:agents:${req.user.companyId}`
+    const data = await getOrSet(key, async () => {
+      return await prisma.user.findMany({
+        where: {
+          role: 'AGENT',
+          companyId: req.user.companyId,
+          isActive: true
+        },
+        include: {
+          _count: { select: { assignedLeads: true } }
+        },
+        orderBy: { name: 'asc' }
+      })
+    }, 300)
+    res.json(data)
   } catch (error) {
     console.error(error)
     res.status(500).json({ message: 'Server error' })

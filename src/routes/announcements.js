@@ -5,19 +5,28 @@ const prisma = require('../utils/prisma')
 const { sendNotificationToCompany } = require('../utils/sendNotification')
 
 // Get all announcements for my company
+const { getOrSet, invalidate } = require('../utils/cache')
+
 router.get('/', protect, async (req, res) => {
   try {
-    const announcements = await prisma.announcement.findMany({
-      where: { companyId: req.user.companyId },
-      include: { createdBy: { select: { name: true, role: true } } },
-      orderBy: { createdAt: 'desc' }
-    })
-    res.json(announcements)
+    const key = `announcements:${req.user.companyId}`
+    const data = await getOrSet(key, async () => {
+      return await prisma.announcement.findMany({
+        where: { companyId: req.user.companyId },
+        include: { createdBy: { select: { name: true, role: true } } },
+        orderBy: { createdAt: 'desc' }
+      })
+    }, 300)
+    res.json(data)
   } catch (error) {
     console.error(error)
     res.status(500).json({ message: 'Server error' })
   }
 })
+
+// Invalidate after create/update/delete
+// Add this after creating announcement:
+// invalidate(`announcements:${req.user.companyId}`)
 
 // Create announcement (HR only)
 router.post('/', protect, authorize('HR', 'SUPER_ADMIN', 'ADMIN'), async (req, res) => {

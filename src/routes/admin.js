@@ -4,15 +4,21 @@ const express = require('express')
 const router = express.Router()
 
 // Get admin stats
+const { getOrSet, invalidate, invalidatePattern } = require('../utils/cache')
+
+// Get admin stats - cache for 2 minutes
 router.get('/stats', protect, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
-    const [pendingUsers, totalAgents, totalLeads, totalCustomers] = await Promise.all([
-      prisma.user.count({ where: { isActive: false } }),
-      prisma.user.count({ where: { role: 'AGENT', isActive: true } }),
-      prisma.lead.count(),
-      prisma.customer.count(),
-    ])
-    res.json({ pendingUsers, totalAgents, totalLeads, totalCustomers })
+    const data = await getOrSet('admin:stats', async () => {
+      const [pendingUsers, totalAgents, totalLeads, totalCustomers] = await Promise.all([
+        prisma.user.count({ where: { isActive: false } }),
+        prisma.user.count({ where: { role: 'AGENT', isActive: true } }),
+        prisma.lead.count(),
+        prisma.customer.count(),
+      ])
+      return { pendingUsers, totalAgents, totalLeads, totalCustomers }
+    }, 120)
+    res.json(data)
   } catch (error) {
     console.error(error)
     res.status(500).json({ message: 'Server error' })
@@ -39,29 +45,33 @@ router.get('/pending-users', protect, authorize('SUPER_ADMIN', 'ADMIN'), async (
   }
 })
 
-// Get all companies
+// Get all companies - cache for 10 minutes
 router.get('/companies', protect, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
-    const companies = await prisma.company.findMany({
-      where: { isActive: true },
-      orderBy: { name: 'asc' }
-    })
-    res.json(companies)
+    const data = await getOrSet('admin:companies', async () => {
+      return await prisma.company.findMany({
+        where: { isActive: true },
+        orderBy: { name: 'asc' }
+      })
+    }, 600)
+    res.json(data)
   } catch (error) {
     console.error(error)
     res.status(500).json({ message: 'Server error' })
   }
 })
 
-// Get all active agents
+// Get all agents - cache for 5 minutes
 router.get('/agents', protect, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
-    const agents = await prisma.user.findMany({
-      where: { role: 'AGENT', isActive: true },
-      include: { company: true },
-      orderBy: { name: 'asc' }
-    })
-    res.json(agents)
+    const data = await getOrSet('admin:agents', async () => {
+      return await prisma.user.findMany({
+        where: { role: 'AGENT', isActive: true },
+        include: { company: true },
+        orderBy: { name: 'asc' }
+      })
+    }, 300)
+    res.json(data)
   } catch (error) {
     console.error(error)
     res.status(500).json({ message: 'Server error' })
@@ -70,6 +80,10 @@ router.get('/agents', protect, authorize('SUPER_ADMIN', 'ADMIN'), async (req, re
 
 // Approve agent
 const { sendNotificationToAdmins } = require('../utils/sendNotification')
+ // Clear cache so new user appears immediately
+    invalidate('admin:agents')
+    invalidate('admin:stats')
+    invalidatePattern('admin:')
 
 // In approve agent route add:
 router.post('/approve-agent/:id', protect, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
@@ -89,6 +103,7 @@ router.post('/approve-agent/:id', protect, authorize('SUPER_ADMIN', 'ADMIN'), as
     // Notify the approved user
     const { sendNotification } = require('../utils/sendNotification')
     await sendNotification(
+      
   parseInt(id),
   'Account approved',
   'Your account has been approved. You can now login to AutoCRM.',
@@ -243,15 +258,17 @@ router.put('/companies/:id/toggle-active', protect, authorize('SUPER_ADMIN', 'AD
     res.status(500).json({ message: 'Server error' })
   }
 })
-// Get all managers
+// Get all managers - cache for 5 minutes
 router.get('/managers', protect, authorize('SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {
-    const managers = await prisma.user.findMany({
-      where: { role: 'MANAGER', isActive: true },
-      include: { company: true },
-      orderBy: { name: 'asc' }
-    })
-    res.json(managers)
+    const data = await getOrSet('admin:managers', async () => {
+      return await prisma.user.findMany({
+        where: { role: 'MANAGER', isActive: true },
+        include: { company: true },
+        orderBy: { name: 'asc' }
+      })
+    }, 300)
+    res.json(data)
   } catch (error) {
     console.error(error)
     res.status(500).json({ message: 'Server error' })

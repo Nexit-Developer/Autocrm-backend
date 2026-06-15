@@ -4,19 +4,23 @@ const { protect, authorize } = require('../middleware/auth')
 const prisma = require('../utils/prisma')
 
 // Get company policy
+const { getOrSet, invalidate } = require('../utils/cache')
+
 router.get('/', protect, async (req, res) => {
   try {
-    const policy = await prisma.policy.findFirst({
-      where: { companyId: req.user.companyId },
-      include: { updatedBy: { select: { name: true } } }
-    })
-    res.json(policy)
+    const key = `policy:${req.user.companyId}`
+    const data = await getOrSet(key, async () => {
+      return await prisma.policy.findFirst({
+        where: { companyId: req.user.companyId },
+        include: { updatedBy: { select: { name: true } } }
+      })
+    }, 600)
+    res.json(data)
   } catch (error) {
     console.error(error)
     res.status(500).json({ message: 'Server error' })
   }
 })
-
 // Create or update policy (HR only)
 router.post('/', protect, authorize('HR', 'SUPER_ADMIN', 'ADMIN'), async (req, res) => {
   try {

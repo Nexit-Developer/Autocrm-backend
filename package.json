@@ -19,6 +19,7 @@
     "express": "^5.2.1",
     "firebase-admin": "^14.0.0",
     "jsonwebtoken": "^9.0.3",
+    "node-cache": "^5.1.2",
     "node-cron": "^4.2.1",
     "nodemailer": "^8.0.10",
     "pg": "^8.21.0",

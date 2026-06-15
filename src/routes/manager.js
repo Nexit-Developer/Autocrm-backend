@@ -121,17 +121,45 @@ router.get('/team', protect, authorize('MANAGER'), async (req, res) => {
 })
 
 // Get team leads for assigning
+const { getOrSet, invalidate } = require('../utils/cache')
+
 router.get('/team-leads', protect, authorize('MANAGER'), async (req, res) => {
   try {
-    const teamLeads = await prisma.user.findMany({
-      where: {
-        companyId: req.user.companyId,
-        role: 'TEAM_LEAD',
-        isActive: true
-      },
-      orderBy: { name: 'asc' }
-    })
-    res.json(teamLeads)
+    const key = `manager:teamleads:${req.user.companyId}`
+    const data = await getOrSet(key, async () => {
+      return await prisma.user.findMany({
+        where: {
+          companyId: req.user.companyId,
+          role: 'TEAM_LEAD',
+          isActive: true
+        },
+        orderBy: { name: 'asc' }
+      })
+    }, 300)
+    res.json(data)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ message: 'Server error' })
+  }
+})
+
+router.get('/agents', protect, authorize('MANAGER'), async (req, res) => {
+  try {
+    const key = `manager:agents:${req.user.companyId}`
+    const data = await getOrSet(key, async () => {
+      return await prisma.user.findMany({
+        where: {
+          role: 'AGENT',
+          companyId: req.user.companyId,
+          isActive: true
+        },
+        include: {
+          _count: { select: { assignedLeads: true } }
+        },
+        orderBy: { name: 'asc' }
+      })
+    }, 300)
+    res.json(data)
   } catch (error) {
     console.error(error)
     res.status(500).json({ message: 'Server error' })
